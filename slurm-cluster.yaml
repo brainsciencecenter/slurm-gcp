@@ -24,7 +24,7 @@ resources:
   type: slurm.jinja
   properties:
     cluster_name            : holder-cluster
-    static_node_count       : 2
+#    static_node_count       : 2
     max_node_count          : 10
 
     zone                    : us-east1-b
