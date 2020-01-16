@@ -37,7 +37,7 @@ required:
 - controller_machine_type
 - default_account
 - default_users
-- login_machine_type
+#- login_machine_type
 - max_node_count
 - private_google_access
 - region

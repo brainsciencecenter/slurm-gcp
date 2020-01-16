@@ -1011,7 +1011,7 @@ def main():
 
     setup_selinux()
 
-    if INSTANCE_TYPE == "compute":
+    if INSTANCE_TYPE == "compute" or INSTANCE_TYPE == 'login':
         while not have_internet():
             print "Waiting for internet connection"
 
@@ -1041,8 +1041,8 @@ def main():
     setup_nfs_home_vols()
     setup_nfs_sec_vols()
 
-    if INSTANCE_TYPE == "controller":
-        mount_nfs_vols()
+    if INSTANCE_TYPE == "controller" or INSTANCE_TYPE == 'login':
+#        mount_nfs_vols()
         start_munge()
         install_slurm()
 

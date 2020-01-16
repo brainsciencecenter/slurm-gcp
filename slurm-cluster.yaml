@@ -23,23 +23,23 @@ resources:
 - name: slurm-cluster
   type: slurm.jinja
   properties:
-    cluster_name            : g1
+    cluster_name            : holder-cluster
     static_node_count       : 2
     max_node_count          : 10
 
-    zone                    : us-central1-b
-    region                  : us-central1
-    cidr                    : 10.10.0.0/16
+    zone                    : us-east1-b
+    region                  : us-east1
+    cidr                    : 10.30.0.0/16
 
     # Optional network configuration fields
     # READ slurm.jinja.schema for prerequisites
-    #vpc_net                 : < my-vpc >
-    #vpc_subnet              : < my-subnet >
+    #vpc_net                 : bsc-host-network
+    #vpc_subnet              : holder-subnet 
     #shared_vpc_host_proj    : < my-shared-vpc-project-name >
 
     controller_machine_type : n1-standard-2
     compute_machine_type    : n1-standard-2
-    login_machine_type      : n1-standard-2
+#    login_machine_type      : n1-standard-2
     #login_node_count        : 0
 
     # Optional compute configuration fields
@@ -81,7 +81,7 @@ resources:
     # Optional timer fields
     #suspend_time               : 300
 
-    default_users           : < GCP user email addr, comma separated >
+    default_users           : holder@pennbrain.upenn.edu
     #slurm_version           : 19.05-latest
     #default_account         : default
 
