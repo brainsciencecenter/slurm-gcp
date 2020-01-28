@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # Copyright 2017 SchedMD LLC.
 # Modified for use with the Slurm Resource Manager.
@@ -22,35 +22,54 @@ import httplib2
 import logging
 import shlex
 import subprocess
+import sys
 import time
+import yaml
+import urllib.request, urllib.parse, urllib.error
+
 
 import googleapiclient.discovery
 from google.auth import compute_engine
 import google_auth_httplib2
 from googleapiclient.http import set_user_agent
 
-CLUSTER_NAME = '@CLUSTER_NAME@'
+def getMetadata(key):
+    METADATA_URL = "http://metadata.google.internal/computeMetadata/v1/instance"
 
-PROJECT      = '@PROJECT@'
-ZONE         = '@ZONE@'
-REGION       = '@REGION@'
-MACHINE_TYPE = '@MACHINE_TYPE@'
-CPU_PLATFORM = '@CPU_PLATFORM@'
-PREEMPTIBLE  = @PREEMPTIBLE@
-EXTERNAL_IP  = @EXTERNAL_COMPUTE_IPS@
-SHARED_VPC_HOST_PROJ = '@SHARED_VPC_HOST_PROJ@'
-VPC_SUBNET   = '@VPC_SUBNET@'
+    req = urllib.request.Request("{}/{}".format(METADATA_URL, key))
+    print("Trying URL '%s'" % (key), file=sys.stderr)
+    req.add_header('Metadata-Flavor', 'Google')
+    resp = urllib.request.urlopen(req)
+    return(resp.read().decode("utf-8"))
 
-DISK_SIZE_GB = '@DISK_SIZE_GB@'
-DISK_TYPE    = '@DISK_TYPE@'
+ClusterConfig = yaml.load(getMetadata('attributes/cluster-config'),Loader=yaml.FullLoader)
 
-LABELS       = @LABELS@
+CLUSTER_NAME = str(ClusterConfig['CLUSTER_NAME'])
+PROJECT      = ClusterConfig['PROJECT']
+ZONE         = ClusterConfig['ZONE']
+
+
+
+PROJECT      = ClusterConfig['PROJECT']
+ZONE         = ClusterConfig['ZONE']
+REGION       = ClusterConfig['REGION']
+MACHINE_TYPE = ClusterConfig['MACHINE_TYPE']
+CPU_PLATFORM = ClusterConfig['CPU_PLATFORM']
+PREEMPTIBLE  = ClusterConfig['PREEMPTIBLE']
+EXTERNAL_IP  = ClusterConfig['EXTERNAL_COMPUTE_IPS']
+SHARED_VPC_HOST_PROJ = ClusterConfig['SHARED_VPC_HOST_PROJ']
+VPC_SUBNET   = ClusterConfig['VPC_SUBNET']
+
+DISK_SIZE_GB = ClusterConfig['DISK_SIZE_GB']
+DISK_TYPE    = ClusterConfig['DISK_TYPE']
+
+LABELS       = {'goog-dm': 'slurm'}
 
 NETWORK_TYPE = 'subnetwork'
 NETWORK      = "projects/{}/regions/{}/subnetworks/{}-slurm-subnet".format(PROJECT, REGION, CLUSTER_NAME)
 
-GPU_TYPE     = '@GPU_TYPE@'
-GPU_COUNT    = '@GPU_COUNT@'
+GPU_TYPE     = ClusterConfig['GPU_TYPE']
+GPU_COUNT    = ClusterConfig['GPU_COUNT']
 
 SCONTROL     = '/apps/slurm/current/bin/scontrol'
 LOGFILE      = '/apps/slurm/log/resume.log'
@@ -107,7 +126,7 @@ def update_slurm_node_addrs(compute):
             subprocess.call(shlex.split(node_update_cmd))
 
             logging.info("Instance " + node_name + " is now up")
-        except Exception, e:
+        except Exception as e:
             logging.exception("Error in adding {} to slurm ({})".format(
                 node_name, str(e)))
 # [END update_slurm_node_addrs]
@@ -157,6 +176,13 @@ def create_instance(compute, project, zone, instance_type, instance_name,
             }]
         }
     }
+
+    cluster_config = open(
+        '/apps/slurm/current/etc/cluster-config.yaml', 'r').read()
+    config['metadata']['items'].append({
+        'key': 'cluster-config',
+        'value': cluster_config
+    })
 
     shutdown_script = open(
         '/apps/slurm/scripts/compute-shutdown', 'r').read()
@@ -216,6 +242,8 @@ def create_instance(compute, project, zone, instance_type, instance_name,
             {'type': 'ONE_TO_ONE_NAT', 'name': 'External NAT'}
         ]
 
+    print("config = ",config)
+
     return compute.instances().insert(
         project=project,
         zone=zone,
@@ -262,7 +290,7 @@ def add_instances(compute, source_disk_image, have_compute_img, node_list):
             batch.execute(http=http)
             if i < (len(batch_list) - 1):
                 time.sleep(30)
-    except Exception, e:
+    except Exception as e:
         logging.exception("error in add batch: " + str(e))
 
     if UPDATE_NODE_ADDRS:
@@ -279,14 +307,14 @@ def main(arg_nodes):
 
     # Get node list
     show_hostname_cmd = "{} show hostnames {}".format(SCONTROL, arg_nodes)
-    nodes_str = subprocess.check_output(shlex.split(show_hostname_cmd))
+    nodes_str = subprocess.check_output(shlex.split(show_hostname_cmd)).decode('utf-8')
     node_list = nodes_str.splitlines()
 
     have_compute_img = False
     try:
         image_response = compute.images().getFromFamily(
             project = PROJECT,
-            family = CLUSTER_NAME + "-compute-image-family").execute()
+            family = CLUSTER_NAME + "-compute-image-familyx").execute()
         if image_response['status'] != "READY":
             logging.debug("image not ready, using the startup script")
             raise Exception("image not ready")
@@ -294,10 +322,11 @@ def main(arg_nodes):
         have_compute_img = True
     except:
         image_response = compute.images().getFromFamily(
-            project='centos-cloud', family='centos-7').execute()
+            project='ubuntu-os-cloud', family='ubuntu-1910').execute()
         source_disk_image = image_response['selfLink']
 
     while True:
+        print("compute = ", compute, "source_disk_image = ", source_disk_image, "have_compute_img = ", have_compute_img, "node_list = ", node_list)
         add_instances(compute, source_disk_image, have_compute_img, node_list)
         if not len(retry_list):
             break;

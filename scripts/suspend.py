@@ -21,12 +21,25 @@ import argparse
 import logging
 import shlex
 import subprocess
+import sys
 import time
+import yaml
 
 import googleapiclient.discovery
 
-PROJECT      = '@PROJECT@'
-ZONE         = '@ZONE@'
+def getMetadata(key):
+    METADATA_URL = "http://metadata.google.internal/computeMetadata/v1/instance"
+
+    req = urllib.request.Request("{}/{}".format(METADATA_URL, key))
+    print("Trying URL '%s'" % (key), file=sys.stderr)
+    req.add_header('Metadata-Flavor', 'Google')
+    resp = urllib.request.urlopen(req)
+    return(resp.read().decode("utf-8"))
+
+ClusterConfig = yaml.load(getMetadata('attributes/cluster-config'),Loader=yaml.FullLoader)
+
+PROJECT      = ClusterConfig['PROJECT']
+ZONE         = ClusterConfig['ZONE']
 SCONTROL     = '/apps/slurm/current/bin/scontrol'
 LOGFILE      = '/apps/slurm/log/suspend.log'
 
