@@ -1118,9 +1118,9 @@ def main():
                 "{}/bin/scontrol update partitionname={} state=up".format(
                     CURR_SLURM_DIR, DEF_PART_NAME)))
 
-            subprocess.call(shlex.split("gcloud compute instances "
-                                        "delete {} --zone {} --quiet".format(
-                                            hostname, ZONE)))
+#            subprocess.call(shlex.split("gcloud compute instances "
+#                                        "delete {} --zone {} --quiet".format(
+#                                            hostname, ZONE)))
         else:
             subprocess.call(shlex.split('systemctl start slurmd'))
 
@@ -1148,9 +1148,9 @@ def main():
 
     end_motd()
 
-    subprocess.call(shlex.split("gcloud compute instances remove-metadata {} "
-                                "--zone={} --keys=startup-script"
-                                .format(hostname, ZONE)))
+#    subprocess.call(shlex.split("gcloud compute instances remove-metadata {} "
+#                                "--zone={} --keys=startup-script"
+#                                .format(hostname, ZONE)))
 # END main()
 
 
