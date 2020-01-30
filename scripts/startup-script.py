@@ -1117,11 +1117,14 @@ def main():
             pass
 
         if hostname == CLUSTER_NAME + "-compute-image":
+            print("starting to save compute-image")
             create_compute_image()
+            print("saved compute-image")
 
             subprocess.call(shlex.split(
                 "{}/bin/scontrol update partitionname={} state=up".format(
                     CURR_SLURM_DIR, DEF_PART_NAME)))
+            print("bringing partition up")
 
 #            subprocess.call(shlex.split("gcloud compute instances "
 #                                        "delete {} --zone {} --quiet".format(
