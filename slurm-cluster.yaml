@@ -35,7 +35,7 @@ resources:
     # READ slurm.jinja.schema for prerequisites
     #vpc_net                 : bsc-host-network
     #vpc_subnet              : holder-subnet 
-    #shared_vpc_host_proj    : < my-shared-vpc-project-name >
+    #shared_vpc_host_proj    : pennbrain-host-3097383fff 
 
     controller_machine_type : n1-standard-2
     compute_machine_type    : n1-standard-2
