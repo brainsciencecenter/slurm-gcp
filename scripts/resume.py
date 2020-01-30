@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # Copyright 2017 SchedMD LLC.
 # Modified for use with the Slurm Resource Manager.
@@ -107,7 +107,7 @@ def update_slurm_node_addrs(compute):
             subprocess.call(shlex.split(node_update_cmd))
 
             logging.info("Instance " + node_name + " is now up")
-        except Exception, e:
+        except Exception as  e:
             logging.exception("Error in adding {} to slurm ({})".format(
                 node_name, str(e)))
 # [END update_slurm_node_addrs]
@@ -262,7 +262,7 @@ def add_instances(compute, source_disk_image, have_compute_img, node_list):
             batch.execute(http=http)
             if i < (len(batch_list) - 1):
                 time.sleep(30)
-    except Exception, e:
+    except Exception as  e:
         logging.exception("error in add batch: " + str(e))
 
     if UPDATE_NODE_ADDRS:
@@ -279,7 +279,7 @@ def main(arg_nodes):
 
     # Get node list
     show_hostname_cmd = "{} show hostnames {}".format(SCONTROL, arg_nodes)
-    nodes_str = subprocess.check_output(shlex.split(show_hostname_cmd))
+    nodes_str = subprocess.check_output(shlex.split(show_hostname_cmd)).decode('utf-8')
     node_list = nodes_str.splitlines()
 
     have_compute_img = False

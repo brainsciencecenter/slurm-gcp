@@ -48,8 +48,8 @@ resources:
     #external_compute_ips       : False
     #private_google_access      : True
 
-    #controller_disk_type       : pd-standard
-    #controller_disk_size_gb    : 50
+    controller_disk_type       : pd-standard
+    controller_disk_size_gb    : 10
     #controller_labels          :
     #     key1 : value1
     #     key2 : value2

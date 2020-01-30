@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # Copyright 2017 SchedMD LLC.
 #
@@ -15,14 +15,14 @@
 # limitations under the License.
 
 import datetime
-import httplib
+import http.client
 import os
 import shlex
 import socket
 import subprocess
+import sys
 import time
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
 
 CLUSTER_NAME      = '@CLUSTER_NAME@'
 MACHINE_TYPE      = '@MACHINE_TYPE@' # e.g. n1-standard-1, n1-starndard-2
@@ -111,11 +111,11 @@ def setup_modules():
 
     appsmfs = '/apps/modulefiles'
 
-    if appsmfs not in open('/usr/share/Modules/init/.modulespath').read():
+    if appsmfs not in open('/usr/share/modules/init/.modulespath').read():
         if INSTANCE_TYPE == 'controller' and not os.path.isdir(appsmfs):
             subprocess.call(['mkdir', '-p', appsmfs])
 
-        with open('/usr/share/Modules/init/.modulespath', 'a') as dotmp:
+        with open('/usr/share/modules/init/.modulespath', 'a') as dotmp:
             dotmp.write(appsmfs)
 
 # END setup_modules
@@ -170,7 +170,7 @@ Either log out and log back in or cd into ~.
 
 
 def have_internet():
-    conn = httplib.HTTPConnection("www.google.com", timeout=1)
+    conn = http.client.HTTPConnection("www.google.com", timeout=1)
     try:
         conn.request("HEAD", "/")
         conn.close()
@@ -184,53 +184,57 @@ def have_internet():
 
 def install_packages():
 
-    packages = ['bind-utils',
-                'epel-release',
-                'gcc',
-                'git',
-                'hwloc',
-                'hwloc-devel',
-                'libibmad',
-                'libibumad',
-                'lua',
-                'lua-devel',
-                'man2html',
-                'mariadb',
-                'mariadb-devel',
-                'mariadb-server',
-                'munge',
-                'munge-devel',
-                'munge-libs',
-                'ncurses-devel',
-                'nfs-utils',
-                'numactl',
-                'numactl-devel',
-                'openssl-devel',
-                'pam-devel',
-                'perl-ExtUtils-MakeMaker',
-                'python-pip',
-                'readline-devel',
-                'rpm-build',
-                'rrdtool-devel',
-                'vim',
-                'wget',
-                'tmux',
-                'pdsh',
-                'openmpi'
-               ]
+    packages = [
+        'dnsutils',
+        'bind9-host',
+        'build-essential',
+        'environment-modules',
+        'git',
+        'hwloc',
+        'lua5.3',
+        'liblua5.3-dev',
+        'man2html',
+        'mariadb-client',
+        'libmariadb-dev',
+        'munge',
+        'libmunge-dev',
+        'libmunge2',
+        'libncurses-dev',
+        'libnfs-utils',
+        'numactl',
+        'libnuma-dev',
+        'libssl-dev',
+        'libpam0g-dev',
+        'libextutils-makemaker-cpanfile-perl',
+        'mariadb-server',
+        'nfs-kernel-server',
+        'python',
+        'python-pip',
+        'python3-pip',
+        'libreadline-dev',
+        'librrd-dev',
+        'vim',
+        'wget',
+        'tmux',
+        'pdsh',
+        'openmpi-bin',
+        'libopenmpi-dev'
+    ]
 
-    while subprocess.call(['yum', 'install', '-y'] + packages):
-        print "yum failed to install packages. Trying again in 5 seconds"
+    subprocess.call(['apt', 'update'])
+    while subprocess.call(['apt', 'install', '-y'] + packages):
+        print("apt failed to install packages. Trying again in 5 seconds")
         time.sleep(5)
 
-    while subprocess.call(['pip', 'install', '--upgrade',
+    while subprocess.call(['pip3', 'install', '--upgrade',
         'cachetools==3.1.1', 'google-api-python-client']):
-        print "failed to install google python api client. Trying again 5 seconds."
+        print("failed to install google python api client. Trying again 5 seconds.")
         time.sleep(5)
 
+    # *** Need to fix for ubuntu
     if GPU_COUNT and (INSTANCE_TYPE == "compute"):
         rpm = "cuda-repo-rhel7-10.0.130-1.x86_64.rpm"
-        subprocess.call("yum -y install kernel-devel-$(uname -r) kernel-headers-$(uname -r)", shell=True)
+        subprocess.call("apt -y install kernel-devel-$(uname -r) kernel-headers-$(uname -r)", shell=True)
         subprocess.call(shlex.split("wget http://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/" + rpm))
         subprocess.call(shlex.split("rpm -i " + rpm))
         subprocess.call(shlex.split("yum clean all"))
@@ -358,8 +362,8 @@ def expand_machine_type():
             gb = type_resp['memoryMb'] / 1024;
             machine['memory'] = type_resp['memoryMb'] - (400 + (gb * 30))
 
-    except Exception, e:
-        print "Failed to get MachineType '%s' from google api (%s)" % (MACHINE_TYPE, str(e))
+    except Exception as  e:
+        print("Failed to get MachineType '%s' from google api (%s)" % (MACHINE_TYPE, str(e)))
 
     return machine
 #END expand_machine_type()
@@ -368,9 +372,9 @@ def expand_machine_type():
 def install_slurm_conf():
 
     machine = expand_machine_type()
-    def_mem_per_cpu = max(100,
+    def_mem_per_cpu = int(max(100,
             (machine['memory'] /
-             (machine['threads']*machine['cores']*machine['sockets'])))
+             (machine['threads']*machine['cores']*machine['sockets']))))
 
     conf = """
 # slurm.conf file generated by configurator.html.
@@ -555,10 +559,10 @@ CommunicationParameters=NoAddrCache
         conf += "GresTypes=gpu\n"
 
     conf += ' '.join(("NodeName=DEFAULT",
-                      "Sockets="        + str(machine['sockets']),
-                      "CoresPerSocket=" + str(machine['cores']),
-                      "ThreadsPerCore=" + str(machine['threads']),
-                      "RealMemory="     + str(machine['memory']),
+                      "Sockets="        + str(int(machine['sockets'])),
+                      "CoresPerSocket=" + str(int(machine['cores'])),
+                      "ThreadsPerCore=" + str(int(machine['threads'])),
+                      "RealMemory="     + str(int(machine['memory'])),
                       "State=UNKNOWN"))
 
     if GPU_COUNT:
@@ -675,37 +679,38 @@ ConstrainDevices=yes
 
 def install_meta_files():
 
-    scripts_path = APPS_DIR + '/slurm/scripts'
+    scripts_path = APPS_DIR + "/slurm/scripts"
     if not os.path.exists(scripts_path):
         os.makedirs(scripts_path)
 
     GOOGLE_URL = "http://metadata.google.internal/computeMetadata/v1/instance/attributes"
 
     meta_files = [
-        {'file': 'suspend.py', 'meta': 'slurm_suspend'},
-        {'file': 'resume.py', 'meta': 'slurm_resume'},
-        {'file': 'startup-script.py', 'meta': 'startup-script-compute'},
-        {'file': 'slurm-gcp-sync.py', 'meta': 'slurm-gcp-sync'},
-        {'file': 'compute-shutdown', 'meta': 'compute-shutdown'},
-        {'file': 'custom-compute-install', 'meta': 'custom-compute-install'},
-        {'file': 'custom-controller-install', 'meta': 'custom-controller-install'},
+        {"file": "suspend.py", "meta": "slurm_suspend"},
+        {"file": "resume.py", "meta": "slurm_resume"},
+        {"file": "startup-script.py", "meta": "startup-script-compute"},
+        {"file": "slurm-gcp-sync.py", "meta": "slurm-gcp-sync"},
+        {"file": "compute-shutdown", "meta": "compute-shutdown"},
+        {"file": "custom-compute-install", "meta": "custom-compute-install"},
+        {"file": "custom-controller-install", "meta": "custom-controller-install"},
     ]
 
     for meta in meta_files:
-        file_name = meta['file']
-        meta_name = meta['meta']
+        file_name = meta["file"]
+        meta_name = meta["meta"]
 
-        req = urllib2.Request("{}/{}".format(GOOGLE_URL, meta_name))
+        req = urllib.request.Request("{}/{}".format(GOOGLE_URL, meta_name))
+        print("Trying URL '%s', file = '%s'" % (meta_name, file_name), file=sys.stderr)
         req.add_header('Metadata-Flavor', 'Google')
-        resp = urllib2.urlopen(req)
+        resp = urllib.request.urlopen(req)
 
         f = open("{}/{}".format(scripts_path, file_name), 'w')
-        f.write(resp.read())
+        f.write(resp.read().decode('utf-8'))
         f.close()
         os.chmod("{}/{}".format(scripts_path, file_name), 0o755)
 
-        subprocess.call(shlex.split("gcloud compute instances remove-metadata {} --zone={} --keys={}".
-                                    format(CONTROL_MACHINE, ZONE, meta_name)))
+        #subprocess.call(shlex.split("gcloud compute instances remove-metadata {} --zone={} --keys={}".
+        #                            format(CONTROL_MACHINE, ZONE, meta_name)))
 
 #END install_meta_files()
 
@@ -730,11 +735,11 @@ def install_slurm():
     else:
         SCHEDMD_URL = 'https://download.schedmd.com/slurm/'
         file = "slurm-%s.tar.bz2" % SLURM_VERSION
-        urllib.urlretrieve(SCHEDMD_URL + file, SRC_PATH + '/' + file)
+        urllib.request.urlretrieve(SCHEDMD_URL + file, SRC_PATH + '/' + file)
 
         cmd = "tar -xvjf " + file
         use_version = subprocess.check_output(
-            shlex.split(cmd)).splitlines()[0][:-1]
+            shlex.split(cmd)).decode('utf-8').splitlines()[0][:-1]
 
     os.chdir(use_version)
     SLURM_PREFIX  = APPS_DIR + '/slurm/' + use_version
@@ -945,7 +950,7 @@ def setup_secondary_disks():
 
 def mount_nfs_vols():
     while subprocess.call(['mount', '-a']):
-        print "Waiting for " + APPS_DIR + " and /home to be mounted"
+        print("Waiting for " + APPS_DIR + " and /home to be mounted")
         time.sleep(5)
 
 #END mount_nfs_vols()
@@ -953,7 +958,7 @@ def mount_nfs_vols():
 # Tune the NFS server to support many mounts
 def setup_nfs_threads():
 
-    f = open('/etc/sysconfig/nfs', 'a')
+    f = open('/etc/default/nfs-default-server', 'a')
     f.write("""
 # Added by Google
 RPCNFSDCOUNT=256
@@ -982,7 +987,7 @@ def create_compute_image():
     if GPU_COUNT:
         time.sleep(300)
 
-    print "Creating compute image..."
+    print("Creating compute image...")
     hostname = socket.gethostname()
     subprocess.call(shlex.split("gcloud compute images "
                                 "create {0}-compute-image-{3} "
@@ -1009,15 +1014,15 @@ def main():
 
     hostname = socket.gethostname()
 
-    setup_selinux()
+    # setup_selinux()
 
     if INSTANCE_TYPE == "compute" or INSTANCE_TYPE == 'login':
         while not have_internet():
-            print "Waiting for internet connection"
+            print("Waiting for internet connection")
 
     if not os.path.exists(APPS_DIR + '/slurm'):
         os.makedirs(APPS_DIR + '/slurm')
-        print "ww Created Slurm Folders"
+        print("ww Created Slurm Folders")
 
     if CONTROLLER_SECONDARY_DISK:
         if not os.path.exists(SEC_DISK_DIR):
@@ -1097,7 +1102,7 @@ def main():
             "{}/bin/scontrol update partitionname={} state=down".format(
                 CURR_SLURM_DIR, DEF_PART_NAME)))
 
-        print "ww Done installing controller"
+        print("ww Done installing controller")
     elif INSTANCE_TYPE == "compute":
         install_compute_service_scripts()
         setup_slurmd_cronjob()
@@ -1140,11 +1145,11 @@ def main():
         # Wait for the compute image to mark the partition up
         part_state = subprocess.check_output(shlex.split(
             "{}/bin/scontrol show part {}".format(
-                CURR_SLURM_DIR, DEF_PART_NAME)))
+                CURR_SLURM_DIR, DEF_PART_NAME))).decode('utf-8')
         while "State=UP" not in part_state:
             part_state = subprocess.check_output(shlex.split(
                 "{}/bin/scontrol show part {}".format(
-                    CURR_SLURM_DIR, DEF_PART_NAME)))
+                    CURR_SLURM_DIR, DEF_PART_NAME))).decode('utf-8')
 
     end_motd()
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2017 SchedMD LLC.
 # Modified for use with the Slurm Resource Manager.
@@ -74,7 +74,7 @@ def delete_instances(compute, node_list):
             batch.execute()
             if i < (len(batch_list) - 1):
                 time.sleep(30)
-    except Exception, e:
+    except Exception as  e:
         logging.exception("error in batch: " + str(e))
 
 # [END delete_instances]
@@ -87,7 +87,7 @@ def main(arg_nodes):
 
     # Get node list
     show_hostname_cmd = "%s show hostnames %s" % (SCONTROL, arg_nodes)
-    nodes_str = subprocess.check_output(shlex.split(show_hostname_cmd))
+    nodes_str = subprocess.check_output(shlex.split(show_hostname_cmd)).decode("utf-8")
     node_list = nodes_str.splitlines()
 
     while True:
