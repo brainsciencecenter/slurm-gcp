@@ -23,10 +23,21 @@ import subprocess
 import sys
 import time
 import urllib.request, urllib.parse, urllib.error
+import yaml
+
+def getMetadata(key):
+    METADATA_URL = "http://metadata.google.internal/computeMetadata/v1/instance"
+
+    req = urllib.request.Request("{}/{}".format(METADATA_URL, key))
+    print("Trying URL '%s'" % (key), file=sys.stderr)
+    req.add_header('Metadata-Flavor', 'Google')
+    resp = urllib.request.urlopen(req)
+    return(resp.read().decode("utf-8"))
+
+ClusterConfig = yaml.load(getMetadata('attributes/cluster-config'),Loader=yaml.FullLoader)
 
 CLUSTER_NAME      = 'holder-cluster'
 MACHINE_TYPE      = 'n1-standard-2' # e.g. n1-standard-1, n1-starndard-2
-INSTANCE_TYPE     = 'compute' # e.g. controller, login, compute
 
 PROJECT           = 'holder-dd34a9'
 ZONE              = 'us-east1-b'
@@ -54,6 +65,18 @@ SUSPEND_TIME      = 300
 
 DEF_PART_NAME   = "debug"
 CONTROL_MACHINE = CLUSTER_NAME + '-controller'
+
+tags = yaml.load(getMetadata('tags'),Loader=yaml.FullLoader)
+if 'controller' in tags:
+    INSTANCE_TYPE = 'controller'
+elif 'compute' in tags:
+    INSTANCE_TYPE = 'compute'
+elif 'login' in tags:
+    INSTANCE_TYPE = 'login'
+else:
+    INSTANCE_TYPE = 'Unknown'    
+
+print("INSTANCE_TYPE", INSTANCE_TYPE)
 
 MOTD_HEADER = '''
 

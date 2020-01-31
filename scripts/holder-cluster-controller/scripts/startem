@@ -1,0 +1,92 @@
+#!/bin/bash
+
+while getopts ciq arg
+do
+    case "$arg" in
+	c|i|q)
+	    eval "opt_${arg}=${OPTARG:=1}"
+	    ;;
+    esac
+done
+
+shift $(($OPTIND - 1))
+
+if [ -n "$opt_q" ]
+then
+    CmdArgs="--verbosity=none -q"
+fi
+
+Group=holder
+Salt=dd34a9
+ClusterName=holder-cluster
+GroupName=${Group}-${Salt}
+InstanceName=${Group}-controller
+BootDiskSize=10G
+Zone=us-east1-b
+ServiceAccount=slurm-gcp@holder-dd34a9.iam.gserviceaccount.com
+Network=https://www.googleapis.com/compute/v1/projects/pennbrain-host-3097383fff/global/networks/bsc-host-network
+Network=https://www.googleapis.com/compute/v1/projects/holder-dd34a9/global/networks/holder-cluster-slurm-network
+SubNet=https://www.googleapis.com/compute/v1/projects/pennbrain-host-3097383fff/regions/us-east1/subnetworks/${Group}-subnet
+SubNet=https://www.googleapis.com/compute/v1/projects/holder-dd34a9/regions/us-east1/subnetworks/holder-cluster-slurm-subnet
+ImageSource=ubuntu-1910-eoan-v20200129
+BootDiskSource=https://compute.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-1910-eoan-v20200129
+ExternalIP=35.231.194.165
+MachineType=n1-standard-2
+#HostName=holder.pennbrain.upenn.edu
+
+SaltBinDir=/home/holder/Work/CfN/salt/bin
+SlurmGCPDir=/home/holder/Work/CfN/gcp/slurm-gcp/scripts/holder-cluster-controller/scripts
+
+if [ ! -z "$opt_c" ]
+then
+
+#	--address=$ExternalIP							\
+
+    InstanceName=${Group}-controller
+    StartupScript=${SlurmGCPDir}/startup-script.py
+gcloud $CmdArgs beta compute instances create $InstanceName		\
+	--project=holder-dd34a9 						\
+	--zone=$Zone								\
+	--machine-type=$MachineType						\
+	--subnet=$SubNet							\
+	--network-tier=PREMIUM							\
+	--tags=controller,holder                                                \
+        --metadata="enable-oslogin=TRUE"					\
+	--metadata-from-file=minion-pem=${SaltBinDir}/minion-holder.pennbrain.upenn.edu.pem,minion-pub=${SaltBinDir}/minion-holder.pennbrain.upenn.edu.pub,startup-script=${StartupScript},slurm_suspend=${SlurmGCPDir}/suspend.py,slurm_resume=${SlurmGCPDir}/resume.py,startup-script-compute=${SlurmGCPDir}/startup-script.py,slurm-gcp-sync=${SlurmGCPDir}/slurm-gcp-sync.py,compute-shutdown=${SlurmGCPDir}/compute-shutdown,custom-compute-install=${SlurmGCPDir}/custom-compute-install,custom-controller-install=${SlurmGCPDir}/custom-controller-install,cluster-config=${SlurmGCPDir}/cluster-config.yaml	\
+	--service-account=$ServiceAccount					\
+	--maintenance-policy=MIGRATE						\
+	--scopes=cloud-platform							\
+	--image=${ImageSource}							\
+	--image-project=ubuntu-os-cloud						\
+	--boot-disk-size=$BootDiskSize						\
+	--boot-disk-type=pd-standard						\
+	--boot-disk-device-name=$InstanceName					\
+	--reservation-affinity=any
+
+fi
+
+if [ ! -z "$opt_i" ]
+then
+    
+InstanceName=${ClusterName}-compute-image
+gcloud --verbosity=none -q beta compute instances create $InstanceName		\
+	--project=holder-dd34a9 						\
+	--zone=$Zone								\
+	--machine-type=$MachineType						\
+        --no-address                                                            \
+	--subnet=$SubNet							\
+	--network-tier=PREMIUM							\
+	--tags=compute,holder                                                          \
+        --metadata="enable-oslogin=TRUE"					\
+	--metadata-from-file=minion-pem=minion-holder.pennbrain.upenn.edu.pem,minion-pub=minion-holder.pennbrain.upenn.edu.pub,startup-script=/home/holder/Work/CfN/gcp/slurm-gcp/scripts/startup-script.py,slurm_suspend=/home/holder/Work/CfN/gcp/slurm-gcp/scripts/suspend.py,slurm_resume=/home/holder/Work/CfN/gcp/slurm-gcp/scripts/resume.py,startup-script-compute=/home/holder/Work/CfN/gcp/slurm-gcp/scripts/startup-script.py,slurm-gcp-sync=/home/holder/Work/CfN/gcp/slurm-gcp/scripts/slurm-gcp-sync.py,compute-shutdown=/home/holder/Work/CfN/gcp/slurm-gcp/scripts/compute-shutdown,custom-compute-install=/home/holder/Work/CfN/gcp/slurm-gcp/scripts/custom-compute-install,custom-controller-install=/home/holder/Work/CfN/gcp/slurm-gcp/scripts/custom-controller-install,cluster-config=/home/holder/Work/CfN/gcp/slurm-gcp/etc/cluster-config.yaml	\
+	--service-account=$ServiceAccount					\
+	--maintenance-policy=MIGRATE						\
+	--scopes=cloud-platform							\
+	--image=ubuntu-1910-eoan-v20200107					\
+	--image-project=ubuntu-os-cloud						\
+	--boot-disk-size=$BootDiskSize						\
+	--boot-disk-type=pd-standard						\
+	--boot-disk-device-name=$InstanceName					\
+	--reservation-affinity=any
+
+fi
